@@ -45,7 +45,7 @@ const allAsync = (query, params = []) => {
     });
 };
 
-export const User = {
+export const UserStorage = {
     get: async (id) => {
         try {
             return await getAsync("SELECT * FROM users WHERE id = ?", [id]);
