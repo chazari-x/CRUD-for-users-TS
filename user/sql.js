@@ -1,54 +1,48 @@
-import sqlite3 from 'sqlite3';
-const db = new sqlite3.Database('crud.db');
+import dotenv from 'dotenv';
+dotenv.config();
 
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS users  (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                        name TEXT, 
-                        email TEXT
-                   )`);
+const dbPort = process.env.PORT;
+const dbHost = process.env.DB_HOST;
+const dbUser = process.env.DB_USER;
+const dbPass = process.env.DB_PASS;
+const dbName = process.env.DB_NAME;
+
+import pkg from 'pg';
+const { Client } = pkg;
+
+const db = new Client({
+    user: dbUser,
+    host: dbHost,
+    database: dbName,
+    password: dbPass,
+    port: dbPort,
 });
 
-const runAsync = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.run(query, params, function (err) {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(this);
-            }
-        });
-    });
-};
+db.connect().then(async () => {
+    console.log('Connected to the database');
 
-const getAsync = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.get(query, params, (err, row) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(row);
-            }
-        });
-    });
-};
+    await db.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            email TEXT
+        )
+    `);
+}).catch(e => {
+    console.error('Failed to connect to the database');
+    console.error(e);
+    process.exit(1);
+});
 
-const allAsync = (query, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.all(query, params, (err, rows) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(rows);
-            }
-        });
-    });
+const queryAsync = (query, params = []) => {
+    return db.query(query, params);
 };
 
 export const UserStorage = {
     get: async (id) => {
         try {
-            return await getAsync("SELECT * FROM users WHERE id = ?", [id]);
+            const res = await queryAsync("SELECT * FROM users WHERE id = $1", [id]);
+            return res.rows[0];
         } catch (err) {
             console.error(err);
             return null;
@@ -56,7 +50,8 @@ export const UserStorage = {
     },
     getAll: async () => {
         try {
-            return await allAsync("SELECT * FROM users");
+            const res = await queryAsync("SELECT * FROM users");
+            return res.rows;
         } catch (err) {
             console.error(err);
             return [];
@@ -68,8 +63,8 @@ export const UserStorage = {
         }
 
         try {
-            const result = await runAsync("INSERT INTO users (name, email) VALUES (?, ?)", [user.name, user.email]);
-            return result.lastID;
+            const res = await queryAsync("INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id", [user.name, user.email]);
+            return res.rows[0].id;
         } catch (err) {
             console.error(err);
             return -1;
@@ -81,13 +76,14 @@ export const UserStorage = {
         }
 
         try {
-            const result = await runAsync(`
+            const res = await queryAsync(`
                 UPDATE users
-                SET name = COALESCE(?, name),
-                    email = COALESCE(?, email)
-                WHERE id = ?
+                SET name = COALESCE($1, name),
+                    email = COALESCE($2, email)
+                WHERE id = $3
+                RETURNING *
             `, [user.name, user.email, id]);
-            return result.changes > 0;
+            return res.rowCount > 0;
         } catch (err) {
             console.error(err);
             return false;
@@ -95,8 +91,8 @@ export const UserStorage = {
     },
     delete: async (id) => {
         try {
-            const result = await runAsync("DELETE FROM users WHERE id = ?", [id]);
-            return result.changes > 0;
+            const res = await queryAsync("DELETE FROM users WHERE id = $1 RETURNING *", [id]);
+            return res.rowCount > 0;
         } catch (err) {
             console.error(err);
             return false;
