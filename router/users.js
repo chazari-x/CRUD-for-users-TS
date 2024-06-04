@@ -9,6 +9,6 @@ router.use((req, res, next) => {
 
 router.get(`/`, User.getAll);
 router.get(`/:id`, User.get);
-router.post(`/`, User.create)
+router.post(`/`, User.create);
 router.put(`/:id`, User.update);
 router.delete(`/:id`, User.delete);
