@@ -1,8 +1,8 @@
 import express from 'express';
 import {router as users} from "./router/users.js";
 
-const app= express();
-const PORT= 3000;
+const app = express();
+const PORT = 3000;
 
 app.use('/api/users', users);
 
